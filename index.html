@@ -242,16 +242,24 @@ function drawFig(s){
  const pts=dailyPts(o),end=pts.length?+pts.at(-1).t:0;pts.splice(0,pts.findIndex(p=>+p.t>end-(+state.range-0.5)*864e5));const W=s.clientWidth,H=s.clientHeight;
  if(pts.length<2){s.innerHTML=`<text x="8" y="28" font-size="14" fill="currentColor" opacity=".7">${pts.length?'目前只有 1 天的資料，累積 2 天以上才會畫出走勢':'沒有水位資料'}</text>`;return}
  const L=W<520?44:56,R=12,T=12,B=28;
- const t0=+pts[0].t,t1=+pts.at(-1).t,lo=Math.min(...pts.map(p=>p.lv)),hi=Math.max(...pts.map(p=>p.lv)),span=(hi-lo)||0.1;
- const X=t=>L+(W-L-R)*((+t-t0)/((t1-t0)||1)),Y=v=>T+(H-T-B)*(1-(v-lo+span*.1)/(span*1.2));
- const path=pts.map((p,i)=>`${i&&(p.t-pts[i-1].t)<=1.6*864e5?'L':'M'}${X(p.t).toFixed(1)} ${Y(p.lv).toFixed(1)}`).join('');
+ const day=p=>new Date(p.t.getFullYear(),p.t.getMonth(),p.t.getDate());
+ const d0=+day(pts[0]),d1=+day(pts.at(-1));
+ let lo=Math.min(...pts.map(p=>p.lv)),hi=Math.max(...pts.map(p=>p.lv));
+ if(hi-lo<0.06){const c=(hi+lo)/2;lo=c-0.03;hi=c+0.03}
+ const span=hi-lo;
+ const X=d=>L+(W-L-R)*((+d-d0)/((d1-d0)||1)),Y=v=>T+(H-T-B)*(1-(v-lo+span*.1)/(span*1.2));
+ const XP=p=>X(day(p));
+ const path=pts.map((p,i)=>`${i&&(p.t-pts[i-1].t)<=1.6*864e5?'L':'M'}${XP(p).toFixed(1)} ${Y(p.lv).toFixed(1)}`).join('');
  const lab=d=>`${d.getMonth()+1}/${d.getDate()}`;
- const yt=[lo,(lo+hi)/2,hi].map(v=>`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="currentColor" opacity=".7">${v.toFixed(2)}</text><line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/>`).join('');
- const tk=[t0,(t0+t1)/2,t1].map(t=>new Date(t)).filter((d,i,a)=>i===0||X(d)-X(a[i-1])>90||i===2);if(tk.length===3&&X(tk[2])-X(tk[1])<90)tk.splice(1,1);
- const xt=W<360?'':tk.map((d,i,a)=>`<text x="${X(d)}" y="${H-8}" font-size="12" text-anchor="${i===0?'start':i===a.length-1?'end':'middle'}" fill="currentColor" opacity=".7">${lab(d)}</text>`).join('');
- const iso=pts.map(p=>`<circle cx="${X(p.t)}" cy="${Y(p.lv)}" r="3" fill="var(--w2)"><title>${lab(p.t)}　${p.lv.toFixed(2)} m</title></circle>`).join('');
+ const yv=[lo,(lo+hi)/2,hi],dec=yv.map(v=>v.toFixed(2)).some((v,i,a)=>a.indexOf(v)!==i)?3:2;
+ const yt=yv.map(v=>`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="currentColor" opacity=".7">${v.toFixed(dec)}</text><line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/>`).join('');
+ const days=pts.map(day),lastX=X(days.at(-1)),tk=[];
+ for(const d of days){const x=X(d);if((!tk.length||x-X(tk.at(-1))>=64)&&lastX-x>=64)tk.push(d)}
+ tk.push(days.at(-1));
+ const xt=W<200?'':tk.map((d,i,a)=>`<text x="${X(d)}" y="${H-8}" font-size="12" text-anchor="${i===0?'start':i===a.length-1?'end':'middle'}" fill="currentColor" opacity=".7">${lab(d)}</text>`).join('');
+ const iso=pts.map(p=>`<circle cx="${XP(p)}" cy="${Y(p.lv)}" r="3" fill="var(--w2)"><title>${lab(p.t)}　${p.lv.toFixed(2)} m</title></circle>`).join('');
  const last=pts.at(-1);
- s.innerHTML=`${yt}${xt}${iso}<path d="${path}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${X(last.t)}" cy="${Y(last.lv)}" r="4.5" fill="var(--w3)" stroke="var(--bg)" stroke-width="2"/>`;
+ s.innerHTML=`${yt}${xt}${iso}<path d="${path}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${XP(last)}" cy="${Y(last.lv)}" r="4.5" fill="var(--w3)" stroke="var(--bg)" stroke-width="2"/>`;
 }
 const figRO=new ResizeObserver(es=>es.forEach(e=>drawFig(e.target)));
 
