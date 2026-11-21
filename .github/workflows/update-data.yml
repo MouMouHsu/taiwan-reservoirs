@@ -17,11 +17,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  # 第一個工作：抓資料、打包網站
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,9 +37,6 @@ jobs:
         with:
           path: _site
 
-      - id: deploy
-        uses: actions/deploy-pages@v4
-
       # 公開 repo 若 60 天沒有任何 commit，GitHub 會自動停用排程；每 25 天留一筆紀錄避免停用
       - name: 保持排程啟用
         if: github.event_name == 'schedule'
@@ -55,3 +50,14 @@ jobs:
             git commit -m "保持排程啟用"
             git push
           fi
+
+  # 第二個工作：打包完成後才發布（GitHub 官方建議的拆分方式）
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
