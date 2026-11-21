@@ -61,6 +61,7 @@ tr.row{cursor:pointer}tr.row:hover td{background:var(--pale)}
 .bar .t i{display:block;height:100%;border-radius:6px}
 .bar b{width:4.2em;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .na{color:var(--mute);font-size:14px}
+.over{display:block;margin-top:4px;font-size:13px;color:var(--acc);white-space:nowrap}
 tr.det td{background:var(--pale);padding:16px}
 .dgrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px}
 .rh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}.rg2{display:flex;gap:6px}.chip.sm{min-height:36px;padding:0 12px;font-size:14px}.note{font-size:13px;color:var(--mute);margin:0 0 6px}
@@ -117,7 +118,7 @@ footer p{margin:0 0 8px;max-width:70em}
 <footer class="band"><div class="wrap">
  <p>資料來源：經濟部水利署「水利資料整合雲平台 Open API」之<a href="https://data.gov.tw/dataset/45501">水庫水情資料</a>與<a href="https://data.gov.tw/dataset/41568">水庫每日營運狀況</a>，依<a href="https://data.gov.tw/license">政府資料開放授權條款－第 1 版</a>使用。</p>
  <p>蓄水率＝即時有效蓄水量 ÷ 每日營運資料之有效容量，由本頁計算。即時資料為監測儀器原始數據，部分未經檢核，請謹慎引用。每日營運資料於每日上午 9:30 前登錄前一日數據，週末資料於週一登錄。每日水位取當天最後一筆觀測，由本站自動收集，保留最近 31 天；當天的數值會隨最新觀測更新。</p>
- <p>本頁顏色僅表示蓄水量多寡，與官方水情燈號無關；水情燈號請以<a href="https://www.wra.gov.tw/">經濟部水利署網站</a>為準。</p>
+ <p>蓄水率超過 100% 表示水位暫時高於滿水位，屬官方資料的實際狀況。本頁顏色僅表示蓄水量多寡，與官方水情燈號無關；水情燈號請以<a href="https://www.wra.gov.tw/">經濟部水利署網站</a>為準。</p>
 </div></footer>
 
 <script>
@@ -152,7 +153,7 @@ async function fetchAll(id){
 function merge(rt,daily,hist){
  const m=new Map();
  const get=id=>{if(!m.has(id))m.set(id,{id,name:null,cap:null,daily:null,series:[]});return m.get(id)};
- for(const d of daily){const o=get(d.reservoiridentifier);o.name=d.reservoirname||o.name;o.cap=num(d.capacity);o.daily=d}
+ for(const d of daily){const o=get(d.reservoiridentifier);o.name=d.reservoirname||o.name;o.cap=num(d.capacity);o.nwl=num(d.nwlmax);o.daily=d}
  if(hist&&hist.r)for(const [id,h] of Object.entries(hist.r)){const o=get(id);if(!o.name&&h.n)o.name=h.n;if(o.cap===null&&h.c)o.cap=h.c;for(const p of h.s||[])o.series.push({t:parseT(p[0]+'T'+(p[3]||'00:00')),lv:p[1],st:p[2]})}
  for(const r of rt){const o=get(r.reservoiridentifier);o.series.push({t:parseT(r.observationtime),lv:num(r.waterlevel),st:num(r.effectivewaterstoragecapacity),out:num(r.totaloutflow),inf:num(r.inflowdischarge)})}
  for(const o of m.values()){
@@ -209,7 +210,7 @@ function renderList(){
   const p=o.pct;
   const row=`<tr class="row" data-id="${esc(o.id)}" tabindex="0" aria-expanded="${state.open===o.id}">
   <td class="nm" data-l="水庫">${esc(o.name)}<small>${o.reg}・${esc(o.id)}</small></td>
-  <td data-l="蓄水率">${p===null?'<span class="na">無即時蓄水資料</span>':`<div class="bar"><div class="t"><i style="width:${Math.min(p,100)}%;background:${shade(p)}"></i></div><b>${fmt(p)}%</b></div>`}</td>
+  <td data-l="蓄水率">${p===null?'<span class="na">無即時蓄水資料</span>':`<div class="bar"><div class="t"><i style="width:${Math.min(p,100)}%;background:${shade(p)}"></i></div><b>${fmt(p)}%</b></div>${o.lv!==null&&o.nwl!==null&&o.nwl!==undefined&&o.lv>o.nwl?`<small class="over">水位高於滿水位（${fmt(o.lv,2)} / ${fmt(o.nwl,2)} m）</small>`:''}`}</td>
   <td class="n" data-l="蓄水 / 容量">${fmt(o.st,1)} / ${fmt(o.cap,1)}</td>
   <td class="n" data-l="水位">${fmt(o.lv,2)}</td>
   <td class="n" data-l="觀測時間">${tstr(o.t)}</td></tr>`;
