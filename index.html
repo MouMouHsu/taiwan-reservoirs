@@ -280,7 +280,7 @@ async function load(){
  $('reload').disabled=true;$('err').hidden=true;
  try{
   const histP=fetch('history.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
-  const [rt,daily,hist]=await Promise.all([fetchAll(RT),fetchAll(DAILY),histP]);
+  const [rt,daily,hist]=await Promise.all([fetchAll(RT),fetchAll(DAILY).catch(()=>[]),histP]);
   if(!rt.length&&!daily.length)throw new Error('API 回傳空資料');
   histInfo=hist;data=merge(rt,daily,hist);renderTop();renderList();
  }catch(err){
