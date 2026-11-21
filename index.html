@@ -63,7 +63,8 @@ tr.row{cursor:pointer}tr.row:hover td{background:var(--pale)}
 .na{color:var(--mute);font-size:14px}
 tr.det td{background:var(--pale);padding:16px}
 .dgrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px}
-.fig{position:relative;min-height:180px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.rh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}.rg2{display:flex;gap:6px}.chip.sm{min-height:36px;padding:0 12px;font-size:14px}.note{font-size:13px;color:var(--mute);margin:0 0 6px}
+.fig{position:relative;min-height:200px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
 dl{margin:0;display:grid;grid-template-columns:auto auto;gap:4px 16px;font-size:14px}
 dt{color:var(--mute)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .msg{padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--pale)}
@@ -115,7 +116,7 @@ footer p{margin:0 0 8px;max-width:70em}
 
 <footer class="band"><div class="wrap">
  <p>資料來源：經濟部水利署「水利資料整合雲平台 Open API」之<a href="https://data.gov.tw/dataset/45501">水庫水情資料</a>與<a href="https://data.gov.tw/dataset/41568">水庫每日營運狀況</a>，依<a href="https://data.gov.tw/license">政府資料開放授權條款－第 1 版</a>使用。</p>
- <p>蓄水率＝即時有效蓄水量 ÷ 每日營運資料之有效容量，由本頁計算。即時資料為監測儀器原始數據，部分未經檢核，請謹慎引用。每日營運資料於每日上午 9:30 前登錄前一日數據，週末資料於週一登錄。</p>
+ <p>蓄水率＝即時有效蓄水量 ÷ 每日營運資料之有效容量，由本頁計算。即時資料為監測儀器原始數據，部分未經檢核，請謹慎引用。每日營運資料於每日上午 9:30 前登錄前一日數據，週末資料於週一登錄。每日水位取當天最後一筆觀測，由本站自動收集，保留最近 31 天；當天的數值會隨最新觀測更新。</p>
  <p>本頁顏色僅表示蓄水量多寡，與官方水情燈號無關；水情燈號請以<a href="https://www.wra.gov.tw/">經濟部水利署網站</a>為準。</p>
 </div></footer>
 
@@ -131,10 +132,11 @@ const fmt=(n,d=1)=>n===null?'—':n.toLocaleString('zh-TW',{minimumFractionDigit
 const parseT=s=>{if(!s)return null;s=String(s).trim();let m=s.match(/^(\d{4})-?(\d{2})-?(\d{2})[Tt ]?(\d{2})?:?(\d{2})?/);if(!m)return null;return new Date(+m[1],m[2]-1,+m[3],+(m[4]||0),+(m[5]||0))};
 const tstr=d=>d?`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'—';
 const shade=p=>p===null?'var(--line)':`hsl(205 ${55+p*.25}% ${78-Math.min(p,100)*.46}%)`;
-let state={region:'all',q:'',sort:'pd',open:null};
+let state={region:'all',q:'',sort:'pd',open:null,range:'30'};
 try{Object.assign(state,JSON.parse(localStorage.getItem('rsv-ui')||'{}'));state.open=null}catch(e){}
-const save=()=>{try{localStorage.setItem('rsv-ui',JSON.stringify({region:state.region,sort:state.sort}))}catch(e){}};
-let data=[];
+if(!['7','30'].includes(state.range))state.range='30';
+const save=()=>{try{localStorage.setItem('rsv-ui',JSON.stringify({region:state.region,sort:state.sort,range:state.range}))}catch(e){}};
+let data=[],histInfo=null;
 
 async function fetchAll(id){
  let out=[];
@@ -147,13 +149,15 @@ async function fetchAll(id){
  return out;
 }
 
-function merge(rt,daily){
+function merge(rt,daily,hist){
  const m=new Map();
  const get=id=>{if(!m.has(id))m.set(id,{id,name:null,cap:null,daily:null,series:[]});return m.get(id)};
  for(const d of daily){const o=get(d.reservoiridentifier);o.name=d.reservoirname||o.name;o.cap=num(d.capacity);o.daily=d}
+ if(hist&&hist.r)for(const [id,h] of Object.entries(hist.r)){const o=get(id);if(!o.name&&h.n)o.name=h.n;if(o.cap===null&&h.c)o.cap=h.c;for(const p of h.s||[])o.series.push({t:parseT(p[0]+'T'+(p[3]||'00:00')),lv:p[1],st:p[2]})}
  for(const r of rt){const o=get(r.reservoiridentifier);o.series.push({t:parseT(r.observationtime),lv:num(r.waterlevel),st:num(r.effectivewaterstoragecapacity),out:num(r.totaloutflow),inf:num(r.inflowdischarge)})}
  for(const o of m.values()){
-  o.series=o.series.filter(s=>s.t).sort((a,b)=>a.t-b.t);
+  const byT=new Map();for(const s of o.series)if(s.t)byT.set(+s.t,s);
+  o.series=[...byT.values()].sort((a,b)=>a.t-b.t);
   const withSt=o.series.filter(s=>s.st!==null), withLv=o.series.filter(s=>s.lv!==null);
   o.st=withSt.length?withSt.at(-1).st:null; o.t=withSt.length?withSt.at(-1).t:(o.series.at(-1)?.t||null);
   o.lv=withLv.length?withLv.at(-1).lv:null;
@@ -215,33 +219,46 @@ function renderList(){
  const f=document.querySelector('.fig svg');if(f){figRO.disconnect();figRO.observe(f)}
 }
 
+function dailyPts(o){
+ const m=new Map();for(const p of o.series){if(p.lv===null||!p.t)continue;const k=p.t.toDateString(),c=m.get(k);if(!c||p.t>=c.t)m.set(k,p)}
+ return [...m.values()].sort((a,b)=>a.t-b.t);
+}
+function rangeNote(o){
+ const pts=dailyPts(o);if(!pts.length)return '';
+ if(pts.length<+state.range)return `<p class="note">目前累積 ${pts.length} 天的資料（自 ${pts[0].t.getMonth()+1}/${pts[0].t.getDate()} 起），每天增加一筆。</p>`;
+ return '';
+}
 function detail(o){
  const d=o.daily||{};
  const rows=[['統計日期',tstr(parseT(d.datetime)).replace(/ 00:00$/,'')],['集水區雨量（mm）',fmt(num(d.basinrainfall))],['進水量（萬 m³）',fmt(num(d.inflow),2)],['取用水量（萬 m³）',fmt(num(d.outflow),2)],['放流量合計（萬 m³）',fmt(num(d.crossflow),2)],['出水量合計（萬 m³）',fmt(num(d.outflowtotal),2)]];
  return `<tr class="det"><td colspan="5"><div class="dgrid">
-  <div><b>近期水位（m）</b><div class="fig"><svg data-id="${esc(o.id)}" role="img" aria-label="${esc(o.name)}近期水位折線圖"></svg></div></div>
+  <div><div class="rh"><b>每日水位（m）</b><span class="rg2">${[['7','7 天'],['30','30 天']].map(([k,n])=>`<button type="button" class="chip sm" data-range="${k}" aria-pressed="${state.range===k}">${n}</button>`).join('')}</span></div>${rangeNote(o)}<div class="fig"><svg data-id="${esc(o.id)}" role="img" aria-label="${esc(o.name)}近期水位折線圖"></svg></div></div>
   <div><b>前一日營運</b>${o.daily?`<dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`:'<p class="na">無每日營運資料</p>'}</div>
  </div></td></tr>`;
 }
 
 function drawFig(s){
  const o=data.find(x=>x.id===s.dataset.id);if(!o)return;
- const W=s.clientWidth,H=s.clientHeight,pts=o.series.filter(p=>p.lv!==null);
- if(pts.length<2){s.innerHTML=`<text x="8" y="28" font-size="14" fill="currentColor" opacity=".7">即時水位資料不足，無法繪圖</text>`;return}
+ const pts=dailyPts(o),end=pts.length?+pts.at(-1).t:0;pts.splice(0,pts.findIndex(p=>+p.t>end-(+state.range-0.5)*864e5));const W=s.clientWidth,H=s.clientHeight;
+ if(pts.length<2){s.innerHTML=`<text x="8" y="28" font-size="14" fill="currentColor" opacity=".7">${pts.length?'目前只有 1 天的資料，累積 2 天以上才會畫出走勢':'沒有水位資料'}</text>`;return}
  const L=W<520?44:56,R=12,T=12,B=28;
  const t0=+pts[0].t,t1=+pts.at(-1).t,lo=Math.min(...pts.map(p=>p.lv)),hi=Math.max(...pts.map(p=>p.lv)),span=(hi-lo)||0.1;
  const X=t=>L+(W-L-R)*((+t-t0)/((t1-t0)||1)),Y=v=>T+(H-T-B)*(1-(v-lo+span*.1)/(span*1.2));
- const path=pts.map((p,i)=>`${i?'L':'M'}${X(p.t).toFixed(1)} ${Y(p.lv).toFixed(1)}`).join('');
+ const path=pts.map((p,i)=>`${i&&(p.t-pts[i-1].t)<=1.6*864e5?'L':'M'}${X(p.t).toFixed(1)} ${Y(p.lv).toFixed(1)}`).join('');
+ const lab=d=>`${d.getMonth()+1}/${d.getDate()}`;
  const yt=[lo,(lo+hi)/2,hi].map(v=>`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="currentColor" opacity=".7">${v.toFixed(2)}</text><line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/>`).join('');
- const xt=W<520?'':[pts[0],pts[Math.floor(pts.length/2)],pts.at(-1)].map((p,i)=>`<text x="${X(p.t)}" y="${H-8}" font-size="12" text-anchor="${['start','middle','end'][i]}" fill="currentColor" opacity=".7">${tstr(p.t)}</text>`).join('');
+ const tk=[t0,(t0+t1)/2,t1].map(t=>new Date(t)).filter((d,i,a)=>i===0||X(d)-X(a[i-1])>90||i===2);if(tk.length===3&&X(tk[2])-X(tk[1])<90)tk.splice(1,1);
+ const xt=W<360?'':tk.map((d,i,a)=>`<text x="${X(d)}" y="${H-8}" font-size="12" text-anchor="${i===0?'start':i===a.length-1?'end':'middle'}" fill="currentColor" opacity=".7">${lab(d)}</text>`).join('');
+ const iso=pts.map(p=>`<circle cx="${X(p.t)}" cy="${Y(p.lv)}" r="3" fill="var(--w2)"><title>${lab(p.t)}　${p.lv.toFixed(2)} m</title></circle>`).join('');
  const last=pts.at(-1);
- s.innerHTML=`${yt}${xt}<path d="${path}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${X(last.t)}" cy="${Y(last.lv)}" r="4.5" fill="var(--w3)" stroke="var(--bg)" stroke-width="2"/>`;
+ s.innerHTML=`${yt}${xt}${iso}<path d="${path}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${X(last.t)}" cy="${Y(last.lv)}" r="4.5" fill="var(--w3)" stroke="var(--bg)" stroke-width="2"/>`;
 }
 const figRO=new ResizeObserver(es=>es.forEach(e=>drawFig(e.target)));
 
 function bind(){
  document.addEventListener('click',e=>{
   const r=e.target.closest('[data-r]');if(r){state.region=r.dataset.r===state.region&&r.classList.contains('rg')?'all':r.dataset.r;save();renderTop();renderList();return}
+  const rb=e.target.closest('[data-range]');if(rb){state.range=rb.dataset.range;save();renderList();return}
   const row=e.target.closest('tr.row');if(row){state.open=state.open===row.dataset.id?null:row.dataset.id;renderList()}
  });
  document.addEventListener('keydown',e=>{const row=e.target.closest?.('tr.row');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();row.click()}});
@@ -253,9 +270,10 @@ function bind(){
 async function load(){
  $('reload').disabled=true;$('err').hidden=true;
  try{
-  const [rt,daily]=await Promise.all([fetchAll(RT),fetchAll(DAILY)]);
+  const histP=fetch('history.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  const [rt,daily,hist]=await Promise.all([fetchAll(RT),fetchAll(DAILY),histP]);
   if(!rt.length&&!daily.length)throw new Error('API 回傳空資料');
-  data=merge(rt,daily);renderTop();renderList();
+  histInfo=hist;data=merge(rt,daily,hist);renderTop();renderList();
  }catch(err){
   $('err').hidden=false;
   $('err').textContent=`無法取得水利署資料（${err.message}）。可能是網路中斷或對方系統維護中，請稍後按「重新整理」再試。`;
