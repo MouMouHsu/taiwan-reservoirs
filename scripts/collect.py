@@ -60,9 +60,15 @@ def main():
     hist = previous["r"] if previous and previous.get("v") == 2 else {}
     print(f"既有歷史：{len(hist)} 座水庫")
 
-    rt, daily = fetch_all(RT), fetch_all(DAILY)
+    rt = fetch_all(RT)
     if not rt:
         raise RuntimeError("水庫水情資料回傳空資料，本次不更新")
+    # 每日營運只提供名稱與有效容量，既有歷史已有這些資料；暫時連不上時沿用舊值繼續
+    try:
+        daily = fetch_all(DAILY)
+    except RuntimeError as e:
+        print(f"警告：每日營運資料暫時無法取得，沿用既有的名稱與容量（{e}）")
+        daily = []
     print(f"即時資料 {len(rt)} 筆，每日營運 {len(daily)} 筆")
 
     for d in daily:
