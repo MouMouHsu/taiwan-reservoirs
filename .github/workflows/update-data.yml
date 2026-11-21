@@ -1,0 +1,57 @@
+name: 更新水庫歷史資料並發布網站
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # 每 3 小時一次（UTC 第 17 分）；API 提供最近 24 小時，漏跑一次也不會缺日
+  workflow_dispatch:         # 可在 Actions 頁面手動執行
+  push:
+    branches: [main]         # 修改網站後自動重新發布
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 準備網站檔案
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+
+      - name: 抓取水利署資料並累積 31 天每日水位
+        env:
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: python3 scripts/collect.py
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # 公開 repo 若 60 天沒有任何 commit，GitHub 會自動停用排程；每 25 天留一筆紀錄避免停用
+      - name: 保持排程啟用
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - last )) -gt $(( 25 * 86400 )) ]; then
+            date -u +%FT%TZ > .keepalive
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .keepalive
+            git commit -m "保持排程啟用"
+            git push
+          fi
