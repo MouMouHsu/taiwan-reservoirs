@@ -23,6 +23,8 @@ OUT = os.environ.get("OUT", "_site/history.json")
 KEEP_DAYS = 31
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 RETRY_WAIT = int(os.environ.get("RETRY_WAIT", "10"))
+# 歷史查詢用的彙總檔（每次由 data/ 的 CSV 重新產生，只放在發布的網站內，不存回 repository）
+Q_DIR = os.environ.get("Q_DIR") or os.path.join(os.path.dirname(OUT) or ".", "q")
 
 # 永久資料表：欄位固定，只附加不改舊列
 RT_COLS = ["date", "reservoir_id", "name", "observed_time", "water_level_m",
@@ -171,6 +173,93 @@ def save_table(kind, cols, new_rows, newer_wins=None):
     return changed
 
 
+RT_KEEP = ("reservoiridentifier", "observationtime", "waterlevel", "effectivewaterstoragecapacity",
+           "inflowdischarge", "totaloutflow")
+
+
+def write_snapshot(rt, daily, now_tw):
+    """最新水情快照 latest.json：網頁直接連水利署失敗時的備援。
+    每座水庫保留最新一筆觀測與最新一筆有蓄水量的觀測；每日營運取得失敗時沿用上一份快照。"""
+    keep = {}
+    for r in rt:
+        rid, t = r.get("reservoiridentifier"), r.get("observationtime") or ""
+        if not rid or not t:
+            continue
+        slim = {k: r.get(k) for k in RT_KEEP}
+        o = keep.setdefault(rid, {})
+        if t >= o.get("last", {}).get("observationtime", ""):
+            o["last"] = slim
+        if r.get("effectivewaterstoragecapacity") not in (None, "") and t >= o.get("st", {}).get("observationtime", ""):
+            o["st"] = slim
+    rows = {json.dumps(v, sort_keys=True): v for o in keep.values() for v in o.values()}
+    if not daily and SITE_URL != "/":
+        try:
+            prev = get_json(SITE_URL + "latest.json", allow_404=True)
+            daily = (prev or {}).get("daily") or []
+        except RuntimeError:
+            daily = []
+    out = {"t": now_tw.strftime("%Y-%m-%dT%H:%M"), "rt": list(rows.values()), "daily": daily}
+    path = os.path.join(os.path.dirname(OUT) or ".", "latest.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    return len(out["rt"]), len(daily)
+
+
+def agg(vals):
+    """[平均, 最低, 最高, 天數]；沒有數值時平均與極值為 None。"""
+    v = [x for x in vals if x is not None]
+    if not v:
+        return [None, None, None, 0]
+    return [round(sum(v) / len(v), 3), min(v), max(v), len(v)]
+
+
+def build_query_files():
+    """讀取全部永久 CSV，產生歷史查詢用的彙總檔：
+    q/index.json            水庫清單、名稱、有效容量、資料起訖日
+    q/<代碼>/<YYYY>.json     該年每天一筆 [日期, 水位, 有效蓄水量]
+    q/<代碼>/m.json、y.json   每月、每年的 [期間, 水位 平均/最低/最高/天數, 蓄水量 平均/最低/最高/天數]"""
+    days, names, caps = {}, {}, {}
+    for kind in ("realtime", "daily"):
+        d = os.path.join(DATA_DIR, kind)
+        if not os.path.isdir(d):
+            continue
+        for fn in sorted(os.listdir(d)):
+            if not fn.endswith(".csv"):
+                continue
+            with open(os.path.join(d, fn), encoding="utf-8", newline="") as f:
+                for row in csv.DictReader(f):
+                    rid = row["reservoir_id"]
+                    if row.get("name"):
+                        names[rid] = row["name"]
+                    if kind == "realtime":
+                        days.setdefault(rid, {})[row["date"]] = (num(row["water_level_m"]), num(row["effective_storage"]))
+                    elif num(row.get("capacity")) is not None:
+                        caps[rid] = num(row["capacity"])
+    index = []
+    for rid, dd in sorted(days.items()):
+        dates = sorted(dd)
+        base = os.path.join(Q_DIR, rid)
+        os.makedirs(base, exist_ok=True)
+        groups = {"y": {}, "m": {}}
+        years = {}
+        for day in dates:
+            lv, st = dd[day]
+            years.setdefault(day[:4], []).append([day, lv, st])
+            for g, k in (("y", day[:4]), ("m", day[:7])):
+                groups[g].setdefault(k, []).append((lv, st))
+        for y, rows in years.items():
+            with open(os.path.join(base, y + ".json"), "w", encoding="utf-8") as f:
+                json.dump(rows, f, separators=(",", ":"))
+        for g, gd in groups.items():
+            out = [[k] + agg([a for a, _ in v]) + agg([b for _, b in v]) for k, v in sorted(gd.items())]
+            with open(os.path.join(base, g + ".json"), "w", encoding="utf-8") as f:
+                json.dump(out, f, separators=(",", ":"))
+        index.append({"id": rid, "n": names.get(rid, ""), "c": caps.get(rid), "from": dates[0], "to": dates[-1]})
+    with open(os.path.join(Q_DIR, "index.json"), "w", encoding="utf-8") as f:
+        json.dump({"r": index}, f, ensure_ascii=False, separators=(",", ":"))
+    return len(index)
+
+
 def main():
     previous = get_json(SITE_URL + "history.json", allow_404=True) if SITE_URL != "/" else None
     hist = previous["r"] if previous and previous.get("v") == 2 else {}
@@ -218,6 +307,7 @@ def main():
                       newer_wins=lambda new, old: new["observed_time"] >= old["observed_time"])
     n_daily = save_table("daily", DAILY_COLS, build_daily_rows(daily)) if daily else 0
     print(f"永久資料：水情新增或更新 {n_rt} 列，每日營運新增或更新 {n_daily} 列")
+    print(f"歷史查詢彙總檔：{build_query_files()} 座水庫")
 
     now_tw = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).replace(tzinfo=None)
     cutoff = (now_tw - datetime.timedelta(days=KEEP_DAYS)).strftime("%Y-%m-%d")
@@ -229,6 +319,7 @@ def main():
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     points = sum(len(o["s"]) for o in hist.values())
+    print("最新水情快照：%d 筆觀測、%d 筆每日營運" % write_snapshot(rt, daily, now_tw))
     print(f"已寫入 {OUT}：{len(hist)} 座水庫、{points} 筆每日資料、{os.path.getsize(OUT):,} bytes")
 
 
