@@ -73,6 +73,19 @@ dt{color:var(--mute)}dd{margin:0;text-align:right;font-variant-numeric:tabular-n
 footer{border-top:1px solid var(--line);font-size:14px;color:var(--mute)}
 footer a{color:var(--acc)}
 footer p{margin:0 0 8px;max-width:70em}
+#hq{border-top:1px solid var(--line)}
+#hq h2{font-size:clamp(20px,2.6vw,26px);margin:0 0 6px}
+#hq .sub{color:var(--mute);margin:0 0 16px;font-size:15px}
+.qf{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;margin-bottom:12px}
+.qf label{display:grid;gap:4px;font-size:14px;color:var(--mute)}
+.qf select,.qf input{border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 10px}
+.qf .rg2{flex-wrap:wrap}
+.qbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:6px 0}
+.qnote{font-size:14px;color:var(--ink);margin:0}.qnote b{color:var(--acc)}
+.qread{min-height:3.2em;font-size:14px;background:var(--pale);border-radius:8px;padding:8px 12px;margin:8px 0 0;font-variant-numeric:tabular-nums}
+.qfig{position:relative;height:clamp(240px,34vw,380px);touch-action:pan-y}.qfig>svg{position:absolute;inset:0;width:100%;height:100%}
+.qleg{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--mute);margin:8px 0 0}.qleg i{display:inline-block;width:22px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.lnk{background:none;border:0;padding:0;min-height:0;color:var(--acc);text-decoration:underline;font-size:14px;margin-top:10px}
 @media(max-width:900px){.hero .top{grid-template-columns:minmax(0,1fr)}.dgrid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){.regions{grid-template-columns:repeat(2,minmax(0,1fr))}
  table{font-size:13px}.stack thead{display:none}.stack tr.row{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}
@@ -115,9 +128,29 @@ footer p{margin:0 0 8px;max-width:70em}
  <p class="na" id="count"></p>
 </div></main>
 
+<section class="band" id="hq" aria-labelledby="hqh"><div class="wrap">
+ <h2 id="hqh">歷史資料查詢</h2>
+ <p class="sub">選擇水庫與起迄日期查看長期變化。期間越長，每個點代表的時間越長：3 個月以內每天一點，2 年以內每週平均，10 年以內每月平均，超過 10 年每年平均。</p>
+ <div class="qf">
+  <label>水庫<select id="qid"></select></label>
+  <label>起日<input id="qfrom" type="date"></label>
+  <label>迄日<input id="qto" type="date"></label>
+  <span class="rg2" id="qquick"></span>
+ </div>
+ <div class="qf">
+  <label>指標<select id="qmet"><option value="pct">蓄水率（%）</option><option value="lv">水位（m）</option><option value="st">有效蓄水量（萬 m³）</option></select></label>
+  <label>每個點代表<select id="qgran"><option value="auto">自動</option><option value="d">每天</option><option value="w">每週平均</option><option value="m">每月平均</option><option value="y">每年平均</option></select></label>
+  <button type="button" class="chip" id="qcsv">下載查詢結果（CSV）</button>
+ </div>
+ <div class="qbar"><p class="qnote" id="qnote" aria-live="polite">載入中…</p></div>
+ <div class="qfig"><svg id="qsvg" role="img" aria-label="歷史資料圖"></svg></div>
+ <div class="qleg" id="qleg"></div>
+ <p class="qread" id="qread" aria-live="polite"></p>
+</div></section>
+
 <footer class="band"><div class="wrap">
  <p>資料來源：經濟部水利署「水利資料整合雲平台 Open API」之<a href="https://data.gov.tw/dataset/45501">水庫水情資料</a>與<a href="https://data.gov.tw/dataset/41568">水庫每日營運狀況</a>，依<a href="https://data.gov.tw/license">政府資料開放授權條款－第 1 版</a>使用。</p>
- <p>蓄水率＝即時有效蓄水量 ÷ 每日營運資料之有效容量，由本頁計算。即時資料為監測儀器原始數據，部分未經檢核，請謹慎引用。每日營運資料於每日上午 9:30 前登錄前一日數據，週末資料於週一登錄。每日水位取當天最後一筆觀測，由本站自動收集，保留最近 31 天；當天的數值會隨最新觀測更新。</p>
+ <p>蓄水率＝即時有效蓄水量 ÷ 每日營運資料之有效容量，由本頁計算。即時資料為監測儀器原始數據，部分未經檢核，請謹慎引用。每日營運資料於每日上午 9:30 前登錄前一日數據，週末資料於週一登錄。每日水位取當天最後一筆觀測，由本站自動收集並永久保存（自 2026 年 11 月 20 日起），當天的數值會隨最新觀測更新。歷史查詢的平均值由本站以每日資料計算，空白日期不列入平均。</p>
  <p>蓄水率超過 100% 表示水位暫時高於滿水位，屬官方資料的實際狀況。本頁顏色僅表示蓄水量多寡，與官方水情燈號無關；水情燈號請以<a href="https://www.wra.gov.tw/">經濟部水利署網站</a>為準。</p>
 </div></footer>
 
@@ -142,7 +175,9 @@ let data=[],histInfo=null;
 async function fetchAll(id){
  let out=[];
  for(let page=1;page<=10;page++){
-  const r=await fetch(`${API}${id}?page=${page}&size=1000`,{cache:'no-store'});
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),20000);
+  let r;try{r=await fetch(`${API}${id}?page=${page}&size=1000`,{cache:'no-store',signal:ac.signal})}
+  catch(e){throw new Error(e.name==='AbortError'?'連線逾時':'無法連線')}finally{clearTimeout(tm)}
   if(!r.ok)throw new Error(`HTTP ${r.status}`);
   let j=await r.json(); if(!Array.isArray(j))j=j.responseData||j.data||[];
   out=out.concat(j); if(j.length<1000)break;
@@ -234,7 +269,7 @@ function detail(o){
  const rows=[['統計日期',tstr(parseT(d.datetime)).replace(/ 00:00$/,'')],['集水區雨量（mm）',fmt(num(d.basinrainfall))],['進水量（萬 m³）',fmt(num(d.inflow),2)],['取用水量（萬 m³）',fmt(num(d.outflow),2)],['放流量合計（萬 m³）',fmt(num(d.crossflow),2)],['出水量合計（萬 m³）',fmt(num(d.outflowtotal),2)]];
  return `<tr class="det"><td colspan="5"><div class="dgrid">
   <div><div class="rh"><b>每日水位（m）</b><span class="rg2">${[['7','7 天'],['30','30 天']].map(([k,n])=>`<button type="button" class="chip sm" data-range="${k}" aria-pressed="${state.range===k}">${n}</button>`).join('')}</span></div>${rangeNote(o)}<div class="fig"><svg data-id="${esc(o.id)}" role="img" aria-label="${esc(o.name)}近期水位折線圖"></svg></div></div>
-  <div><b>前一日營運</b>${o.daily?`<dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`:'<p class="na">無每日營運資料</p>'}</div>
+  <div><b>前一日營運</b>${o.daily?`<dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`:'<p class="na">無每日營運資料</p>'}<button type="button" class="lnk" data-hq="${esc(o.id)}">查詢這座水庫的長期歷史</button></div>
  </div></td></tr>`;
 }
 
@@ -267,6 +302,7 @@ const figRO=new ResizeObserver(es=>es.forEach(e=>drawFig(e.target)));
 function bind(){
  document.addEventListener('click',e=>{
   const r=e.target.closest('[data-r]');if(r){state.region=r.dataset.r===state.region&&r.classList.contains('rg')?'all':r.dataset.r;save();renderTop();renderList();return}
+  const hb=e.target.closest('[data-hq]');if(hb){HQ.open(hb.dataset.hq);return}
   const rb=e.target.closest('[data-range]');if(rb){state.range=rb.dataset.range;save();renderList();return}
   const row=e.target.closest('tr.row');if(row){state.open=state.open===row.dataset.id?null:row.dataset.id;renderList()}
  });
@@ -280,9 +316,18 @@ async function load(){
  $('reload').disabled=true;$('err').hidden=true;
  try{
   const histP=fetch('history.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
-  const [rt,daily,hist]=await Promise.all([fetchAll(RT),fetchAll(DAILY).catch(()=>[]),histP]);
-  if(!rt.length&&!daily.length)throw new Error('API 回傳空資料');
+  // 直接連水利署失敗時，改用本站 GitHub Actions 收集的最新快照（latest.json）
+  const snap=()=>fetch('latest.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  let [rt,daily,hist]=await Promise.all([fetchAll(RT).catch(e=>e),fetchAll(DAILY).catch(()=>null),histP]);
+  let note='';
+  if(rt instanceof Error||!rt.length){
+   const why=rt instanceof Error?rt.message:'回傳空資料',s=await snap();
+   if(!s||!s.rt||!s.rt.length)throw new Error(why);
+   rt=s.rt;if(!daily)daily=s.daily||[];
+   const t=s.t||'';note=`水利署資料暫時無法取得（${why}），目前顯示本站於 ${+t.slice(5,7)}/${+t.slice(8,10)} ${t.slice(11,16)} 收集的資料，每 15 分鐘會自動再試。`;
+  }else if(!daily){const s=await snap();daily=(s&&s.daily)||[]}
   histInfo=hist;data=merge(rt,daily,hist);renderTop();renderList();
+  $('err').hidden=!note;$('err').textContent=note;
  }catch(err){
   $('err').hidden=false;
   $('err').textContent=`無法取得水利署資料（${err.message}）。可能是網路中斷或對方系統維護中，請稍後按「重新整理」再試。`;
@@ -290,7 +335,146 @@ async function load(){
  }finally{$('reload').disabled=false}
 }
 
-bind();load();
+// ===== 歷史資料查詢：依期間長短自動以每天、每週、每月、每年平均呈現 =====
+const HQ=(()=>{
+ const DAY=864e5;
+ const MET={pct:['蓄水率','%'],lv:['水位','m'],st:['有效蓄水量','萬 m³']};
+ const GN={d:'每天',w:'每週平均',m:'每月平均',y:'每年平均'}, UN={d:'天',w:'週',m:'月',y:'年'};
+ const q={idx:null,id:null,from:0,to:0,met:'pct',gran:'auto',g:'d',pts:[],agg:false,tok:0,hover:-1};
+ try{Object.assign(q,JSON.parse(localStorage.getItem('rsv-hq')||'{}'))}catch(e){}
+ if(!MET[q.met])q.met='pct';if(!['auto','d','w','m','y'].includes(q.gran))q.gran='auto';
+ const keep=()=>{try{localStorage.setItem('rsv-hq',JSON.stringify({id:q.id,met:q.met,gran:q.gran}))}catch(e){}};
+ const cache=new Map();
+ const getJ=u=>{if(!cache.has(u))cache.set(u,fetch(u).then(r=>r.ok?r.json():null).catch(()=>null));return cache.get(u)};
+ const D=s=>Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10)||1);
+ const S=t=>new Date(t).toISOString().slice(0,10);
+ const nd=(a,b)=>Math.round((b-a)/DAY)+1;
+ const auto=n=>n<=92?'d':n<=731?'w':n<=3653?'m':'y';
+ const cur=()=>q.idx&&q.idx.r.find(r=>r.id===q.id);
+ const nm=r=>r.n||`水庫 ${r.id}`;
+ const dec=()=>q.met==='lv'?2:q.met==='pct'?1:0;
+ const f=v=>v==null?'—':v.toLocaleString('zh-TW',{minimumFractionDigits:dec(),maximumFractionDigits:dec()});
+ const period=(g,t)=>{const d=new Date(t),y=d.getUTCFullYear(),m=d.getUTCMonth();
+  if(g==='d')return[t,t];
+  if(g==='w'){const a=t-((d.getUTCDay()+6)%7)*DAY;return[a,a+6*DAY]}
+  if(g==='m')return[Date.UTC(y,m,1),Date.UTC(y,m+1,0)];
+  return[Date.UTC(y,0,1),Date.UTC(y,11,31)]};
+ const mval=(lv,st,c)=>q.met==='lv'?lv:q.met==='st'?st:(st!=null&&c?st/c*100:null);
+
+ function fromDaily(rows,c){
+  const m=new Map();
+  for(const [ds,lv,st] of rows){const t=D(ds);if(t<q.from||t>q.to)continue;const v=mval(lv,st,c);if(v==null)continue;
+   const [a,b]=period(q.g,t);let o=m.get(a);if(!o)m.set(a,o={t0:a,t1:b,v:[]});o.v.push(v)}
+  return [...m.values()].sort((x,y)=>x.t0-y.t0).map(o=>{const s=o.v.reduce((x,y)=>x+y,0);
+   return{t0:o.t0,t1:o.t1,a:s/o.v.length,lo:Math.min(...o.v),hi:Math.max(...o.v),n:o.v.length,exp:nd(Math.max(o.t0,q.from),Math.min(o.t1,q.to))}});
+ }
+ function fromAgg(rows,c,end){
+  const k=q.met==='lv'?1:5, sc=q.met==='pct'?(c?100/c:null):1;
+  const out=[];
+  for(const r of rows){const [a,b]=period(q.g,D(r[0].length===4?r[0]+'-01-01':r[0]+'-01'));
+   if(b<q.from||a>q.to||r[k]==null||sc==null)continue;
+   out.push({t0:a,t1:b,a:r[k]*sc,lo:r[k+1]*sc,hi:r[k+2]*sc,n:r[k+3],exp:nd(a,Math.min(b,end))})}
+  return out;
+ }
+
+ async function run(){
+  const r=cur();if(!r)return;const tok=++q.tok;
+  const n=nd(q.from,q.to);q.g=q.gran==='auto'?auto(n):q.gran;
+  const y0=Math.max(+S(q.from).slice(0,4),+r.from.slice(0,4)),y1=Math.min(+S(q.to).slice(0,4),+r.to.slice(0,4));
+  q.agg=!(q.g==='d'||q.g==='w'||y1-y0<=10);
+  $('qnote').textContent='載入中…';
+  let pts;
+  if(q.agg){const rows=await getJ(`q/${r.id}/${q.g}.json`);pts=rows?fromAgg(rows,r.c,D(r.to)):[]}
+  else{const ys=[];for(let y=y0;y<=y1;y++)ys.push(getJ(`q/${r.id}/${y}.json`));
+   const all=(await Promise.all(ys)).filter(Boolean).flat();pts=fromDaily(all,r.c)}
+  if(tok!==q.tok)return;
+  q.pts=pts;q.hover=pts.length-1;
+  const partEdge=q.agg&&pts.length&&((pts[0].t0<q.from&&q.from>D(r.from))||(pts.at(-1).t1>q.to&&q.to<D(r.to)));
+  $('qnote').innerHTML=`${esc(nm(r))}・${S(q.from)} 至 ${S(q.to)}（${n.toLocaleString()} 天）・以<b>${GN[q.g]}</b>呈現${q.gran==='auto'?'（自動）':''}・共 ${pts.length} 點${partEdge?`；起迄所在的${UN[q.g]}以整${UN[q.g]}平均`:''}`;
+  $('qleg').innerHTML=q.g==='d'?`<span><i style="background:var(--w2);height:3px"></i>每天的值</span>`
+   :`<span><i style="background:var(--w2);height:3px"></i>平均</span><span><i style="background:var(--w1);opacity:.5"></i>該期間最低到最高</span><span>空心點：資料不足該期間一半，平均僅供參考</span>`;
+  draw();
+ }
+
+ function nice(span){const p=10**Math.floor(Math.log10(span)),m=span/p;return(m<=1.5?1:m<=3?2:m<=7?5:10)*p}
+ function draw(){
+  const s=$('qsvg'),W=s.clientWidth,H=s.clientHeight;if(!W||!q.idx)return;
+  const P=q.pts;
+  if(!P.length){s.innerHTML=`<text x="8" y="28" font-size="14" fill="currentColor" opacity=".75">這段期間沒有${MET[q.met][0]}資料${q.met==='pct'?'（部分水庫沒有蓄水量，可改選「水位」）':''}</text>`;$('qread').textContent='';return}
+  const L=W<520?50:64,R=14,T=14,B=30,x0=q.from,x1=q.to;
+  const mid=p=>(Math.max(p.t0,x0)+Math.min(p.t1,x1))/2;
+  const X=t=>L+(W-L-R)*(x1>x0?(t-x0)/(x1-x0):.5);
+  let lo=Math.min(...P.map(p=>p.lo)),hi=Math.max(...P.map(p=>p.hi));
+  if(hi-lo<1e-6){lo-=1;hi+=1}const pad=(hi-lo)*.08;lo-=pad;hi+=pad;
+  const Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  const st=nice((hi-lo)/4),dd=Math.max(0,-Math.floor(Math.log10(st)));
+  let yt='';for(let v=Math.ceil(lo/st)*st;v<=hi;v+=st)yt+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="currentColor" opacity=".7">${v.toFixed(dd)}</text>`;
+  if(q.met==='pct'&&100>lo&&100<hi)yt+=`<line x1="${L}" x2="${W-R}" y1="${Y(100)}" y2="${Y(100)}" stroke="var(--acc)" stroke-dasharray="6 5" opacity=".8"/><text x="${W-R}" y="${Y(100)-5}" text-anchor="end" font-size="12" fill="var(--acc)">100%</text>`;
+  // X 軸刻度：依期間長短改用年、月或日
+  const span=nd(x0,x1),tk=[];const yr0=new Date(x0).getUTCFullYear(),yr1=new Date(x1).getUTCFullYear();
+  if(span>3*366){const step=Math.max(1,Math.ceil((yr1-yr0+1)*70/(W-L-R)));for(let y=yr0;y<=yr1+1;y++)if((y-yr0)%step===0)tk.push([Date.UTC(y,0,1),String(y)])}
+  else if(span>100){const mo=Math.max(1,Math.ceil(span/30.4*72/(W-L-R)));const st=[1,2,3,6,12].find(v=>v>=mo)||12;
+   for(let t=Date.UTC(yr0,0,1);t<=x1;){const d=new Date(t),m=d.getUTCMonth();if(m%st===0&&t>=x0)tk.push([t,m===0?String(d.getUTCFullYear()):`${d.getUTCFullYear()}/${m+1}`]);t=Date.UTC(d.getUTCFullYear(),m+1,1)}}
+  else{const step=Math.max(1,Math.ceil(span*60/(W-L-R)));for(let t=x0;t<=x1;t+=step*DAY){const d=new Date(t);tk.push([t,`${d.getUTCMonth()+1}/${d.getUTCDate()}`])}}
+  const xt=tk.filter(([t])=>t>=x0&&t<=x1).map(([t,l])=>`<line x1="${X(t)}" x2="${X(t)}" y1="${H-B}" y2="${H-B+5}" stroke="currentColor" opacity=".4"/><text x="${Math.min(Math.max(X(t),L+14),W-R-14)}" y="${H-8}" font-size="12" text-anchor="middle" fill="currentColor" opacity=".7">${l}</text>`).join('');
+  // 缺漏超過一個期間就斷線
+  const segs=[];let sg=[];P.forEach((p,i)=>{if(i&&p.t0-P[i-1].t1>1.5*DAY){segs.push(sg);sg=[]}sg.push(p)});segs.push(sg);
+  let band='',line='';
+  for(const g of segs){
+   if(q.g!=='d')band+=g.length>1?`<path d="M${g.map(p=>`${X(mid(p)).toFixed(1)} ${Y(p.hi).toFixed(1)}`).join('L')}L${g.slice().reverse().map(p=>`${X(mid(p)).toFixed(1)} ${Y(p.lo).toFixed(1)}`).join('L')}Z" fill="var(--w1)" opacity=".45"/>`
+    :`<line x1="${X(mid(g[0]))}" x2="${X(mid(g[0]))}" y1="${Y(g[0].hi)}" y2="${Y(g[0].lo)}" stroke="var(--w1)" stroke-width="8" opacity=".6"/>`;
+   if(g.length>1)line+=`<path d="M${g.map(p=>`${X(mid(p)).toFixed(1)} ${Y(p.a).toFixed(1)}`).join('L')}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  }
+  const dots=P.length<=160||q.g!=='d'?P.map(p=>{const thin=p.n<p.exp*.5;return`<circle cx="${X(mid(p))}" cy="${Y(p.a)}" r="${P.length>120?2.5:3.5}" fill="${thin?'var(--bg)':'var(--w2)'}" stroke="var(--w2)" stroke-width="${thin?2:0}"/>`}).join(''):'';
+  s.innerHTML=`${yt}${xt}${band}${line}${dots}<g id="qhov"></g><text x="${L}" y="${T-2}" font-size="12" fill="currentColor" opacity=".7">${MET[q.met][1]}</text>`;
+  s._X=X;s._Y=Y;s._mid=mid;s._L=L;s._T=T;s._B=B;
+  hover(q.hover);
+ }
+ const lab=p=>{const a=new Date(p.t0),b=new Date(p.t1);
+  if(q.g==='d')return S(p.t0).replaceAll('-','/');
+  if(q.g==='w')return `${S(p.t0).replaceAll('-','/')} 至 ${b.getUTCMonth()+1}/${b.getUTCDate()} 這週`;
+  if(q.g==='m')return `${a.getUTCFullYear()} 年 ${a.getUTCMonth()+1} 月`;
+  return `${a.getUTCFullYear()} 年`};
+ function hover(i){
+  const s=$('qsvg'),p=q.pts[i];if(!p||!s._X)return;q.hover=i;
+  const x=s._X(s._mid(p)),y=s._Y(p.a),u=MET[q.met][1],m=MET[q.met][0];
+  s.querySelector('#qhov').innerHTML=`<line x1="${x}" x2="${x}" y1="${s._T}" y2="${s.clientHeight-s._B}" stroke="currentColor" opacity=".35"/><circle cx="${x}" cy="${y}" r="5.5" fill="var(--w3)" stroke="var(--bg)" stroke-width="2"/>`;
+  $('qread').innerHTML=q.g==='d'?`<b>${lab(p)}</b>　${m} ${f(p.a)} ${u}`
+   :`<b>${lab(p)}</b>　${m}平均 ${f(p.a)} ${u}（最低 ${f(p.lo)}、最高 ${f(p.hi)}），含 ${p.n} 天資料${p.n<p.exp*.5?`；該期間共 ${p.exp} 天，資料不足一半，平均僅供參考`:''}`;
+ }
+ function setRange(a,b){const r=cur();if(!r)return;const lo=D(r.from),hi=D(r.to);
+  a=Math.min(Math.max(a,lo),hi);b=Math.min(Math.max(b,lo),hi);if(a>b)[a,b]=[b,a];
+  q.from=a;q.to=b;for(const [id,v] of [['qfrom',a],['qto',b]]){const e=$(id);e.min=r.from;e.max=r.to;e.value=S(v)}}
+ function quick(){const r=cur();if(!r)return;
+  $('qquick').innerHTML=[['30','30 天'],['365','1 年'],['1826','5 年'],['all','全部']].map(([k,t])=>`<button type="button" class="chip sm" data-qq="${k}">${t}</button>`).join('')}
+ async function init(){
+  q.idx=await getJ('q/index.json');
+  if(!q.idx||!q.idx.r.length){$('qnote').textContent='歷史資料尚未產生，下一次自動更新後就會出現。';return}
+  const rs=q.idx.r.slice().sort((a,b)=>a.id.localeCompare(b.id));
+  $('qid').innerHTML=rs.map(r=>`<option value="${esc(r.id)}">${esc(nm(r))}（${REG[r.id[0]]||'其他'}・${esc(r.id)}）</option>`).join('');
+  if(!cur())q.id=(rs.find(r=>r.id==='10201')||rs.find(r=>r.c)||rs[0]).id;
+  $('qid').value=q.id;$('qmet').value=q.met;$('qgran').value=q.gran;quick();
+  const r=cur();setRange(D(r.to)-364*DAY,D(r.to));
+  $('qid').addEventListener('change',e=>{q.id=e.target.value;keep();setRange(q.from,q.to);if(q.from===q.to){const r=cur();setRange(D(r.to)-364*DAY,D(r.to))}run()});
+  $('qmet').addEventListener('change',e=>{q.met=e.target.value;keep();run()});
+  $('qgran').addEventListener('change',e=>{q.gran=e.target.value;keep();run()});
+  for(const id of ['qfrom','qto'])$(id).addEventListener('change',()=>{const a=$('qfrom').value,b=$('qto').value;if(a&&b){setRange(D(a),D(b));run()}});
+  $('qquick').addEventListener('click',e=>{const b=e.target.closest('[data-qq]');if(!b)return;const r=cur(),end=D(r.to);
+   setRange(b.dataset.qq==='all'?D(r.from):end-(+b.dataset.qq-1)*DAY,end);run()});
+  $('qcsv').addEventListener('click',()=>{if(!q.pts.length)return;const r=cur(),m=`${MET[q.met][0]}（${MET[q.met][1]}）`;
+   const rows=[['期間起','期間迄',`${m}平均`,'最低','最高','資料天數'],...q.pts.map(p=>[S(p.t0),S(p.t1),p.a.toFixed(3),p.lo.toFixed(3),p.hi.toFixed(3),p.n])];
+   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+rows.map(x=>x.join(',')).join('\n')],{type:'text/csv'}));
+   a.download=`${nm(r)}_${S(q.from)}_${S(q.to)}_${GN[q.g]}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
+  const sv=$('qsvg');
+  sv.addEventListener('pointermove',e=>{if(!sv._X||!q.pts.length)return;const x=e.clientX-sv.getBoundingClientRect().left;
+   let bi=0,bd=1e9;q.pts.forEach((p,i)=>{const d=Math.abs(sv._X(sv._mid(p))-x);if(d<bd){bd=d;bi=i}});if(bi!==q.hover)hover(bi)});
+  new ResizeObserver(draw).observe(sv);
+  run();
+ }
+ return{init,open:id=>{if(!q.idx||!q.idx.r.some(r=>r.id===id))return;q.id=id;$('qid').value=id;keep();setRange(q.from,q.to);run();$('hq').scrollIntoView({behavior:'smooth'})}};
+})();
+
+bind();load();HQ.init();
 setInterval(load,15*60*1000);
 }
 </script>
