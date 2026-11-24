@@ -15,7 +15,7 @@
 :root{color-scheme:light dark;
  --bg:light-dark(#ffffff,#07182b);--ink:light-dark(#0a1f33,#e6f0fa);--mute:light-dark(#4a6177,#9db4c9);
  --deep:light-dark(#0b3d6e,#0b3d6e);--pale:light-dark(#e8f2fb,#0d2440);--line:light-dark(#cfe0ef,#1d3a5c);
- --acc:light-dark(#0090b8,#3cc4e6);--w1:#9fd0ee;--w2:#2a86c9;--w3:#0b4f8f}
+ --acc:light-dark(#0090b8,#3cc4e6);--pos:light-dark(#00695c,#5fd3a8);--neg:light-dark(#c24e00,#ffab70);--w1:#9fd0ee;--w2:#2a86c9;--w3:#0b4f8f}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;overflow-x:clip}
@@ -68,6 +68,10 @@ tr.det td{background:var(--pale);padding:16px}
 .fig{position:relative;min-height:200px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
 dl{margin:0;display:grid;grid-template-columns:auto auto;gap:4px 16px;font-size:14px}
 dt{color:var(--mute)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+dl.ops{column-gap:0}dl.ops dd{padding-left:16px}dl.ops .gap{height:.55em}dl.ops .div{border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+dl.ops .sg{display:inline-block;width:1.2em;font-weight:700}dl.ops .pos{color:var(--pos)}dl.ops .neg{color:var(--neg)}
+dl.ops .sum{border-top:1px solid var(--line);padding-top:4px}dl.ops .net{border-top:2px solid var(--line);padding-top:6px;margin-top:2px;font-weight:700;color:var(--ink);font-size:15px}
+.opsn{font-size:12.5px;color:var(--mute);margin:6px 0 0}
 .msg{padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--pale)}
 .msg[hidden]{display:none}
 footer{border-top:1px solid var(--line);font-size:14px;color:var(--mute)}
@@ -264,12 +268,32 @@ function rangeNote(o){
  if(pts.length<+state.range)return `<p class="note">目前累積 ${pts.length} 天的資料（自 ${pts[0].t.getMonth()+1}/${pts[0].t.getDate()} 起），每天增加一筆。</p>`;
  return '';
 }
+const isToday=t=>{const n=new Date();return t&&t.getFullYear()===n.getFullYear()&&t.getMonth()===n.getMonth()&&t.getDate()===n.getDate()};
+function todayNote(o){
+ const pts=dailyPts(o),l=pts.at(-1);if(pts.length<2||!isToday(l.t))return '';
+ return `<p class="note">最右邊的點是今天（截至 ${String(l.t.getHours()).padStart(2,'0')}:${String(l.t.getMinutes()).padStart(2,'0')}），今天還沒結束、數值仍會變動，所以用虛線連接；其餘每天取當天最後一筆觀測。</p>`;
+}
 function detail(o){
  const d=o.daily||{};
- const rows=[['統計日期',tstr(parseT(d.datetime)).replace(/ 00:00$/,'')],['集水區雨量（mm）',fmt(num(d.basinrainfall))],['進水量（萬 m³）',fmt(num(d.inflow),2)],['取用水量（萬 m³）',fmt(num(d.outflow),2)],['放流量合計（萬 m³）',fmt(num(d.crossflow),2)],['出水量合計（萬 m³）',fmt(num(d.outflowtotal),2)]];
+ const inf=num(d.inflow),use=num(d.outflow),rel=num(d.crossflow);
+ let tot=num(d.outflowtotal);if(tot===null&&(use!==null||rel!==null))tot=(use||0)+(rel||0);
+ const net=inf!==null&&tot!==null?inf-tot:null;
+ // 流入為加、流出為減，最後列出淨變化
+ const v=(x,sg,c)=>x===null?'—':`<span class="${c}">${sg}${fmt(Math.abs(x),2)}</span>`;
+ const k=(t,sg,c)=>`<span class="sg ${c}" aria-hidden="true">${sg}</span>${t}`;
+ const ops=`<dl class="ops">
+  <dt>統計日期</dt><dd>${tstr(parseT(d.datetime)).replace(/ 00:00$/,'')}</dd>
+  <dt>集水區雨量（mm）</dt><dd>${fmt(num(d.basinrainfall))}</dd>
+  <dt class="div">${k('進水量（萬 m³）','＋','pos')}</dt><dd class="div">${v(inf,'+','pos')}</dd>
+  <dt class="gap" aria-hidden="true"></dt><dd class="gap" aria-hidden="true"></dd>
+  <dt>${k('取用水量（萬 m³）','－','neg')}</dt><dd>${v(use,'−','neg')}</dd>
+  <dt>${k('放流量合計（萬 m³）','－','neg')}</dt><dd>${v(rel,'−','neg')}</dd>
+  <dt class="sum">${k('出水量合計（萬 m³）','＝','neg')}</dt><dd class="sum">${v(tot,'−','neg')}</dd>
+  <dt class="net">淨變化（萬 m³）</dt><dd class="net">${net===null?'—':`<span class="${net>0?'pos':net<0?'neg':''}">${net>0?'+':net<0?'−':''}${fmt(Math.abs(net),2)}　${net>0?'增加':net<0?'減少':'持平'}</span>`}</dd>
+ </dl><p class="opsn">淨變化 = 進水量 − 出水量合計（取用水量＋放流量合計），正值代表蓄水增加。</p>`;
  return `<tr class="det"><td colspan="5"><div class="dgrid">
-  <div><div class="rh"><b>每日水位（m）</b><span class="rg2">${[['7','7 天'],['30','30 天']].map(([k,n])=>`<button type="button" class="chip sm" data-range="${k}" aria-pressed="${state.range===k}">${n}</button>`).join('')}</span></div>${rangeNote(o)}<div class="fig"><svg data-id="${esc(o.id)}" role="img" aria-label="${esc(o.name)}近期水位折線圖"></svg></div></div>
-  <div><b>前一日營運</b>${o.daily?`<dl>${rows.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`:'<p class="na">無每日營運資料</p>'}<button type="button" class="lnk" data-hq="${esc(o.id)}">查詢這座水庫的長期歷史</button></div>
+  <div><div class="rh"><b>每日水位（m）</b><span class="rg2">${[['7','7 天'],['30','30 天']].map(([k,n])=>`<button type="button" class="chip sm" data-range="${k}" aria-pressed="${state.range===k}">${n}</button>`).join('')}</span></div>${rangeNote(o)}<div class="fig"><svg data-id="${esc(o.id)}" role="img" aria-label="${esc(o.name)}近期水位折線圖"></svg></div>${todayNote(o)}</div>
+  <div><b>前一日營運</b>${o.daily?ops:'<p class="na">無每日營運資料</p>'}<button type="button" class="lnk" data-hq="${esc(o.id)}">查詢這座水庫的長期歷史</button></div>
  </div></td></tr>`;
 }
 
@@ -285,17 +309,20 @@ function drawFig(s){
  const span=hi-lo;
  const X=d=>L+(W-L-R)*((+d-d0)/((d1-d0)||1)),Y=v=>T+(H-T-B)*(1-(v-lo+span*.1)/(span*1.2));
  const XP=p=>X(day(p));
- const path=pts.map((p,i)=>`${i&&(p.t-pts[i-1].t)<=1.6*864e5?'L':'M'}${XP(p).toFixed(1)} ${Y(p.lv).toFixed(1)}`).join('');
- const lab=d=>`${d.getMonth()+1}/${d.getDate()}`;
+ const live=isToday(pts.at(-1).t),body=live?pts.slice(0,-1):pts;
+ const path=body.map((p,i)=>`${i&&(p.t-body[i-1].t)<=1.6*864e5?'L':'M'}${XP(p).toFixed(1)} ${Y(p.lv).toFixed(1)}`).join('');
+ const pv=pts.at(-2),lp=pts.at(-1);
+ const dash=live&&(+day(lp)-+day(pv))<=1.6*864e5?`<path d="M${XP(pv).toFixed(1)} ${Y(pv.lv).toFixed(1)}L${XP(lp).toFixed(1)} ${Y(lp.lv).toFixed(1)}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-dasharray="6 5"/>`:'';
+ const lab=d=>live&&+d===d1?'今天':`${d.getMonth()+1}/${d.getDate()}`;
  const yv=[lo,(lo+hi)/2,hi],dec=yv.map(v=>v.toFixed(2)).some((v,i,a)=>a.indexOf(v)!==i)?3:2;
  const yt=yv.map(v=>`<text x="${L-6}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="currentColor" opacity=".7">${v.toFixed(dec)}</text><line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/>`).join('');
  const days=pts.map(day),lastX=X(days.at(-1)),tk=[];
  for(const d of days){const x=X(d);if((!tk.length||x-X(tk.at(-1))>=64)&&lastX-x>=64)tk.push(d)}
  tk.push(days.at(-1));
  const xt=W<200?'':tk.map((d,i,a)=>`<text x="${X(d)}" y="${H-8}" font-size="12" text-anchor="${i===0?'start':i===a.length-1?'end':'middle'}" fill="currentColor" opacity=".7">${lab(d)}</text>`).join('');
- const iso=pts.map(p=>`<circle cx="${XP(p)}" cy="${Y(p.lv)}" r="3" fill="var(--w2)"><title>${lab(p.t)}　${p.lv.toFixed(2)} m</title></circle>`).join('');
+ const iso=pts.map(p=>`<circle cx="${XP(p)}" cy="${Y(p.lv)}" r="3" fill="var(--w2)"><title>${lab(day(p))}　${p.lv.toFixed(2)} m</title></circle>`).join('');
  const last=pts.at(-1);
- s.innerHTML=`${yt}${xt}${iso}<path d="${path}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${XP(last)}" cy="${Y(last.lv)}" r="4.5" fill="var(--w3)" stroke="var(--bg)" stroke-width="2"/>`;
+ s.innerHTML=`${yt}${xt}${iso}<path d="${path}" fill="none" stroke="var(--w2)" stroke-width="2.5" stroke-linejoin="round"/>${dash}<circle cx="${XP(last)}" cy="${Y(last.lv)}" r="4.5" fill="${live?'var(--bg)':'var(--w3)'}" stroke="${live?'var(--w3)':'var(--bg)'}" stroke-width="${live?2.5:2}"/>`;
 }
 const figRO=new ResizeObserver(es=>es.forEach(e=>drawFig(e.target)));
 
