@@ -68,7 +68,7 @@ tr.det td{background:var(--pale);padding:16px}
 .fig{position:relative;min-height:200px}.fig>svg{position:absolute;inset:0;width:100%;height:100%}
 dl{margin:0;display:grid;grid-template-columns:auto auto;gap:4px 16px;font-size:14px}
 dt{color:var(--mute)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-dl.ops{column-gap:0}dl.ops dd{padding-left:16px}dl.ops .gap{height:.55em}dl.ops .div{border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
+dl.ops{column-gap:0}dl.ops .lag{display:block;font-size:12px;color:var(--mute)}dl.ops dd{padding-left:16px}dl.ops .gap{height:.55em}dl.ops .div{border-top:1px solid var(--line);padding-top:6px;margin-top:2px}
 dl.ops .sg{display:inline-block;width:1.2em;font-weight:700}dl.ops .pos{color:var(--pos)}dl.ops .neg{color:var(--neg)}
 dl.ops .sum{border-top:1px solid var(--line);padding-top:4px}dl.ops .net{border-top:2px solid var(--line);padding-top:6px;margin-top:2px;font-weight:700;color:var(--ink);font-size:15px}
 .opsn{font-size:12.5px;color:var(--mute);margin:6px 0 0}
@@ -273,16 +273,21 @@ function todayNote(o){
  const pts=dailyPts(o),l=pts.at(-1);if(pts.length<2||!isToday(l.t))return '';
  return `<p class="note">最右邊的點是今天（截至 ${String(l.t.getHours()).padStart(2,'0')}:${String(l.t.getMinutes()).padStart(2,'0')}），今天還沒結束、數值仍會變動，所以用虛線連接；其餘每天取當天最後一筆觀測。</p>`;
 }
+// 水利署每天早上分批公布前一日資料；尚未公布時註明，避免誤以為是昨天的數據
+function lagNote(dt){
+ const t=parseT(dt);if(!t)return '';const y=new Date();y.setHours(0,0,0,0);y.setDate(y.getDate()-1);
+ return t<y?`<small class="lag">（${y.getMonth()+1}/${y.getDate()} 尚未公布）</small>`:'';
+}
 function detail(o){
  const d=o.daily||{};
  const inf=num(d.inflow),use=num(d.outflow),rel=num(d.crossflow);
  let tot=num(d.outflowtotal);if(tot===null&&(use!==null||rel!==null))tot=(use||0)+(rel||0);
  const net=inf!==null&&tot!==null?inf-tot:null;
  // 流入為加、流出為減，最後列出淨變化
- const v=(x,sg,c)=>x===null?'—':`<span class="${c}">${sg}${fmt(Math.abs(x),2)}</span>`;
+ const v=(x,sg,c)=>x===null?'—':Math.abs(x)<0.005?'0.00':`<span class="${c}">${sg}${fmt(Math.abs(x),2)}</span>`;
  const k=(t,sg,c)=>`<span class="sg ${c}" aria-hidden="true">${sg}</span>${t}`;
  const ops=`<dl class="ops">
-  <dt>統計日期</dt><dd>${tstr(parseT(d.datetime)).replace(/ 00:00$/,'')}</dd>
+  <dt>統計日期</dt><dd>${tstr(parseT(d.datetime)).replace(/ 00:00$/,'')}${lagNote(d.datetime)}</dd>
   <dt>集水區雨量（mm）</dt><dd>${fmt(num(d.basinrainfall))}</dd>
   <dt class="div">${k('進水量（萬 m³）','＋','pos')}</dt><dd class="div">${v(inf,'+','pos')}</dd>
   <dt class="gap" aria-hidden="true"></dt><dd class="gap" aria-hidden="true"></dd>
@@ -345,14 +350,21 @@ async function load(){
   const histP=fetch('history.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
   // 直接連水利署失敗時，改用本站 GitHub Actions 收集的最新快照（latest.json）
   const snap=()=>fetch('latest.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  const s0=snap();   // 快照同時開始下載，作為備援與補缺
   let [rt,daily,hist]=await Promise.all([fetchAll(RT).catch(e=>e),fetchAll(DAILY).catch(()=>null),histP]);
   let note='';
   if(rt instanceof Error||!rt.length){
-   const why=rt instanceof Error?rt.message:'回傳空資料',s=await snap();
+   const why=rt instanceof Error?rt.message:'回傳空資料',s=await s0;
    if(!s||!s.rt||!s.rt.length)throw new Error(why);
-   rt=s.rt;if(!daily)daily=s.daily||[];
+   rt=s.rt;
    const t=s.t||'';note=`水利署資料暫時無法取得（${why}），目前顯示本站於 ${+t.slice(5,7)}/${+t.slice(8,10)} ${t.slice(11,16)} 收集的資料，每 15 分鐘會自動再試。`;
-  }else if(!daily){const s=await snap();daily=(s&&s.daily)||[]}
+  }
+  // 每日營運：逐座水庫取日期較新的一筆；水利署更新中回傳空資料或缺漏時，以快照補上
+  const best=new Map();
+  for(const [src,list] of [['live',daily||[]],['snap',((await s0)||{}).daily||[]]])
+   for(const d of list){const id=d.reservoiridentifier,o=best.get(id);if(!id)continue;
+    if(!o||(d.datetime||'')>(o.datetime||''))best.set(id,d)}
+  daily=[...best.values()];
   histInfo=hist;data=merge(rt,daily,hist);renderTop();renderList();
   $('err').hidden=!note;$('err').textContent=note;
  }catch(err){
